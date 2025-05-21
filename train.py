@@ -6,13 +6,13 @@ import torch
 import os
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--steps",          type=int, default=100000,          help='-')
-parser.add_argument("--scale",          type=int, default=2,               help='-')
+parser.add_argument("--steps",          type=int, default=300000,          help='-')
+parser.add_argument("--scale",          type=int, default=3,               help='-')
 parser.add_argument("--batch-size",     type=int, default=128,             help='-')
 parser.add_argument("--save-every",     type=int, default=100,             help='-')
 parser.add_argument("--save-best-only", type=int, default=0,               help='-')
 parser.add_argument("--save-log",       type=int, default=0,               help='-')
-parser.add_argument("--ckpt-dir",       type=str, default="checkpoint/x2", help='-')
+parser.add_argument("--ckpt-dir",       type=str, default="checkpoint/x3", help='-')
 
 
 # -----------------------------------------------------------
@@ -27,14 +27,17 @@ save_log = (FLAG.save_log == 1)
 save_best_only = (FLAG.save_best_only == 1)
 
 scale = FLAG.scale
-if scale not in [2, 3, 4]:
-    raise ValueError("scale must be 2, 3 or 4")
+if scale != 3:
+    raise ValueError("Only scale=3 is supported in this version.")
 
 ckpt_dir = FLAG.ckpt_dir
 if (ckpt_dir == "") or (ckpt_dir == "default"):
     ckpt_dir = f"checkpoint/x{scale}"
+
 model_path = os.path.join(ckpt_dir, f"FSRCNN-x{scale}.pt")
+#최종 학습이 완료된 후 저장할 FSRCNN 모델의 파일 경로
 ckpt_path = os.path.join(ckpt_dir, f"ckpt.pt")
+#학습 중간에 저장되는 체크포인트(중간 상태) 파일 경로
 
 
 
@@ -54,6 +57,15 @@ valid_set = dataset(dataset_dir, "validation")
 valid_set.generate(lr_crop_size, hr_crop_size)
 valid_set.load_data()
 
+#① 원본 이미지를 로딩, HR 이미지(train/image1.png)를 메모리로 읽음
+#② 여러 개의 crop 위치를 랜덤으로 정함, 예를 들어 512x512 이미지에서 랜덤한 위치를 선택해 30x30짜리 crop을 뽑음
+#③ HR crop과 그에 대응되는 LR crop을 생성, HR crop: 원본의 30x30 영역 그대로 사용. LR crop: HR crop을 1/3로 다운샘플 (→ 10x10로 만들기).
+#④ 이런 쌍을 계속 만들어 메모리에 저장, 1개의 원본 이미지로부터 수십~수백 개의 (LR, HR) 쌍을 생성
+
+#왜 crop을 쓰나?
+#학습 데이터 수를 늘리기 위해: 원본 한 장으로도 수백 개의 학습 쌍 생성 가능
+#메모리 효율성: 큰 이미지를 통째로 GPU에 넣는 것보다 작은 crop이 더 효율적
+#다양한 위치와 패턴 학습 가능: 랜덤하게 자르면 다양한 텍스처를 모델이 배울 수 있음
 
 # -----------------------------------------------------------
 #  Train

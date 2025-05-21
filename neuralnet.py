@@ -6,24 +6,27 @@ class FSRCNN_model(nn.Module):
     def __init__(self, scale: int) -> None:
         super(FSRCNN_model, self).__init__()
 
-        if scale not in [2, 3, 4]:
-            raise ValueError("must be 2, 3 or 4")
+        if scale != 3:
+            raise ValueError("Only scale=3 is supported in this version.")
 
         d = 56
         s = 12
-
+        
+        # 1단계: 특징 추출
         self.feature_extract = nn.Conv2d(in_channels=3, out_channels=d, kernel_size=5, padding=2)
         nn.init.kaiming_normal_(self.feature_extract.weight)
         nn.init.zeros_(self.feature_extract.bias)
 
         self.activation_1 = nn.PReLU(num_parameters=d)
 
+        # 2단계: 축소(Shrinking)
         self.shrink = nn.Conv2d(in_channels=d, out_channels=s, kernel_size=1)
         nn.init.kaiming_normal_(self.shrink.weight)
         nn.init.zeros_(self.shrink.bias)
 
         self.activation_2 = nn.PReLU(num_parameters=s)
         
+        # 3단계: 비선형 매핑 (Mapping)
         # m = 4
         self.map_1 = nn.Conv2d(in_channels=s, out_channels=s, kernel_size=3, padding=1)
         nn.init.kaiming_normal_(self.map_1.weight)
@@ -43,12 +46,14 @@ class FSRCNN_model(nn.Module):
 
         self.activation_3 = nn.PReLU(num_parameters=s)
 
+        # 4단계: 확장 (Expanding)
         self.expand = nn.Conv2d(in_channels=s, out_channels=d, kernel_size=1)
         nn.init.kaiming_normal_(self.expand.weight)
         nn.init.zeros_(self.expand.bias)
 
         self.activation_4 = nn.PReLU(num_parameters=d)
 
+        # 5단계: 업샘플링 (Deconvolution)
         self.deconv = nn.ConvTranspose2d(in_channels=d, out_channels=3, kernel_size=9, 
                                         stride=scale, padding=4, output_padding=scale-1)
         nn.init.normal_(self.deconv.weight, mean=0.0, std=0.001)
